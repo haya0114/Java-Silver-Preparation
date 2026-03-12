@@ -29,10 +29,14 @@
   .toggle-btn{font-family:'JetBrains Mono',monospace;font-size:12px;padding:7px 18px;border-radius:20px;border:1px solid var(--border);background:var(--surface2);color:var(--text-muted);cursor:pointer;transition:all 0.15s;}
   .toggle-btn.active{border-color:var(--accent2);color:var(--accent2);background:rgba(47,109,181,0.08);}
   .action-row-home{display:flex;justify-content:space-between;align-items:center;margin-top:4px;}
-  .progress-wrap{margin-bottom:8px;}
-  .progress-info{display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;margin-bottom:6px;}
-  .progress-bar{height:4px;background:var(--border);border-radius:2px;overflow:hidden;}
-  .progress-fill{height:100%;background:linear-gradient(90deg,#2f6db5,#1a4f8a);border-radius:2px;transition:width 0.4s ease;}
+  .qnav-wrap{margin-bottom:10px;}
+  .qnav-info{display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;margin-bottom:8px;}
+  .qnav-grid{display:flex;flex-wrap:wrap;gap:5px;}
+  .qnav-btn{width:30px;height:30px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface2);color:var(--text-muted);font-family:'JetBrains Mono',monospace;font-size:11px;cursor:pointer;transition:all 0.15s;display:flex;align-items:center;justify-content:center;padding:0;flex-shrink:0;}
+  .qnav-btn:hover{border-color:var(--accent2);color:var(--accent2);}
+  .qnav-btn.current{border-color:var(--accent2);background:var(--accent2);color:#fff;font-weight:700;}
+  .qnav-btn.done-correct{border-color:var(--correct);background:rgba(42,125,79,0.12);color:var(--correct);}
+  .qnav-btn.done-wrong{border-color:var(--wrong);background:rgba(192,57,43,0.1);color:var(--wrong);}
   .quiz-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:28px;margin-bottom:16px;position:relative;overflow:hidden;}
   .quiz-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#2f6db5,#1a4f8a);}
   .question-meta{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
@@ -55,7 +59,7 @@
   .explanation-box{background:var(--surface2);border:1px solid var(--border);border-left:3px solid var(--accent3);border-radius:8px;padding:16px;margin-top:16px;font-size:14px;line-height:1.8;color:var(--text-muted);display:none;}
   .explanation-box.show{display:block;}
   .explanation-box strong{color:var(--accent3);font-family:'JetBrains Mono',monospace;}
-  .action-row{display:flex;gap:12px;justify-content:flex-end;margin-top:20px;flex-wrap:wrap;}
+  .action-row{display:flex;justify-content:space-between;align-items:center;margin-top:20px;}
   .btn{font-family:'JetBrains Mono',monospace;font-size:13px;padding:10px 22px;border-radius:8px;border:none;cursor:pointer;transition:all 0.15s ease;font-weight:600;}
   .btn-primary{background:linear-gradient(135deg,#2f6db5,#1a4f8a);color:#fff;}
   .btn-primary:hover{opacity:0.88;transform:translateY(-1px);}
@@ -162,12 +166,12 @@
 
 <!-- QUIZ -->
 <div class="screen" id="screenQuiz">
-  <div class="progress-wrap">
-    <div class="progress-info">
+  <div class="qnav-wrap">
+    <div class="qnav-info">
       <span id="progressText">問題 1 / ?</span>
       <span id="scoreText">正解: 0</span>
     </div>
-    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+    <div class="qnav-grid" id="qnavGrid"></div>
   </div>
   <div class="quiz-card">
     <div class="question-meta">
@@ -179,10 +183,13 @@
     <div class="options" id="optionsContainer"></div>
     <div class="explanation-box" id="explanationBox"></div>
     <div class="action-row">
-      <button class="btn btn-danger" onclick="backToSelect()">← 戻る</button>
-      <button class="btn btn-ghost" id="skipBtn" onclick="nextQuestion()">スキップ</button>
-      <button class="btn btn-primary" id="submitBtn" onclick="submitAnswer()" disabled>答える</button>
-      <button class="btn btn-primary" id="nextBtn" onclick="nextQuestion()" style="display:none">次へ →</button>
+      <button class="btn btn-danger" onclick="backToSelect()" title="ホームに戻る">⌂</button>
+      <div style="display:flex;gap:10px;align-items:center;">
+        <button class="btn btn-ghost" id="prevBtn" onclick="prevQuestion()">←</button>
+        <button class="btn btn-ghost" id="skipBtn" onclick="nextQuestion()">→</button>
+        <button class="btn btn-primary" id="submitBtn" onclick="submitAnswer()" disabled>答える</button>
+        <button class="btn btn-primary" id="nextBtn" onclick="nextQuestion()" style="display:none">次へ →</button>
+      </div>
     </div>
   </div>
 </div>
@@ -272,6 +279,7 @@ const SESSION_ID=(()=>{
 
 let chapters=[],questions=[],currentIndex=0,score=0;
 let selectedAnswers=[],answered=false,isMockMode=false,selectedChapterId=null;
+let answeredMap={};  // {questionIndex: {selected, isCorrect}}
 let currentFilter='all';
 let currentUser=null;
 
@@ -391,17 +399,20 @@ async function startQuiz(){
   if(!selectedChapterId)return;
   const{data}=await db.from('questions').select('*').eq('chapter_id',selectedChapterId).order('question_no');
   if(!data||!data.length){alert('問題が見つかりませんでした');return;}
-  questions=data;currentIndex=0;score=0;
+  questions=data;currentIndex=0;score=0;answeredMap={};
   showScreen('screenQuiz');renderQuestion();
 }
 
 // ===== QUIZ =====
 function renderQuestion(){
   const q=questions[currentIndex];
-  answered=false;selectedAnswers=[];
+  const prev=answeredMap[currentIndex];
+  answered=!!prev;
+  selectedAnswers=prev?[...prev.selected]:[];
+
   document.getElementById('progressText').textContent='問題 '+(currentIndex+1)+' / '+questions.length;
   document.getElementById('scoreText').textContent='正解: '+score;
-  document.getElementById('progressFill').style.width=(currentIndex/questions.length*100)+'%';
+  renderQNav();
   document.getElementById('questionBadge').textContent='問題 '+q.question_no;
   document.getElementById('multiBadge').style.display=q.multi?'inline-block':'none';
   document.getElementById('questionText').textContent=q.text;
@@ -411,12 +422,31 @@ function renderQuestion(){
   document.getElementById('optionsContainer').innerHTML=q.options.map(o=>
     '<button class="option-btn" id="opt-'+o.letter+'" onclick="selectOption(\''+o.letter+'\')"><span class="letter">'+o.letter+'</span><span>'+escHtml(o.text)+'</span></button>'
   ).join('');
-  document.getElementById('explanationBox').className='explanation-box';
-  document.getElementById('explanationBox').innerHTML='';
-  document.getElementById('submitBtn').style.display='inline-block';
-  document.getElementById('submitBtn').disabled=true;
-  document.getElementById('nextBtn').style.display='none';
-  document.getElementById('skipBtn').style.display='inline-block';
+
+  if(prev){
+    // 回答済み：読み取り専用で復元
+    q.options.forEach(opt=>{
+      const btn=document.getElementById('opt-'+opt.letter);
+      btn.disabled=true;
+      if(q.correct.includes(opt.letter))btn.classList.add('correct');
+      else if(prev.selected.includes(opt.letter))btn.classList.add('wrong');
+    });
+    const exp=document.getElementById('explanationBox');
+    exp.innerHTML='<strong>正解: '+q.correct.join('・')+'</strong><br><br>'+q.explanation;
+    exp.classList.add('show');
+    document.getElementById('submitBtn').style.display='none';
+    document.getElementById('skipBtn').style.display='none';
+    document.getElementById('nextBtn').style.display='inline-block';
+  } else {
+    // 未回答
+    document.getElementById('explanationBox').className='explanation-box';
+    document.getElementById('explanationBox').innerHTML='';
+    document.getElementById('submitBtn').style.display='inline-block';
+    document.getElementById('submitBtn').disabled=true;
+    document.getElementById('nextBtn').style.display='none';
+    document.getElementById('skipBtn').style.display='inline-block';
+  }
+  document.getElementById('prevBtn').disabled=(currentIndex===0);
 }
 
 function selectOption(letter){
@@ -454,12 +484,39 @@ async function submitAnswer(){
   document.getElementById('skipBtn').style.display='none';
   document.getElementById('nextBtn').style.display='inline-block';
   document.getElementById('scoreText').textContent='正解: '+score;
+  renderQNav();
+
+  answeredMap[currentIndex]={selected:[...selectedAnswers],isCorrect};
 
   // user_idがあればuser_idで、なければsession_idで保存
   const record={question_id:q.id,selected:selectedAnswers,is_correct:isCorrect};
   if(currentUser) record.user_id=currentUser.id;
   else record.session_id=SESSION_ID;
   await db.from('answer_history').insert(record);
+}
+
+function renderQNav(){
+  const grid=document.getElementById('qnavGrid');
+  if(!grid)return;
+  grid.innerHTML=questions.map((_,i)=>{
+    const prev=answeredMap[i];
+    let cls='qnav-btn';
+    if(i===currentIndex) cls+=' current';
+    else if(prev) cls+=prev.isCorrect?' done-correct':' done-wrong';
+    const label=prev?(prev.isCorrect?'✓':'✗'):(i+1);
+    return `<button class="${cls}" onclick="jumpTo(${i})">${label}</button>`;
+  }).join('');
+}
+
+function jumpTo(i){
+  currentIndex=i;
+  renderQuestion();
+}
+
+function prevQuestion(){
+  if(currentIndex===0)return;
+  currentIndex--;
+  renderQuestion();
 }
 
 function nextQuestion(){
@@ -477,7 +534,7 @@ function showResult(){
   document.getElementById('resultSub').textContent=sub;
 }
 
-function retryQuiz(){currentIndex=0;score=0;showScreen('screenQuiz');renderQuestion();}
+function retryQuiz(){currentIndex=0;score=0;answeredMap={};showScreen('screenQuiz');renderQuestion();}
 function backToSelect(){
   selectedChapterId=null;
   document.getElementById('startBtn').disabled=true;
