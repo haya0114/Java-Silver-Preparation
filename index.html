@@ -184,7 +184,6 @@
     <div class="loading-wrap">読み込み中<span class="loading-dot">.</span><span class="loading-dot">.</span><span class="loading-dot">.</span></div>
   </div>
   <div class="action-row-home">
-    <div class="bookmark-start-info" id="bookmarkInfo" style="display:none"></div>
     <div></div>
     <button class="btn btn-primary" id="startBtn" onclick="startQuiz()" disabled>開始する →</button>
   </div>
@@ -359,19 +358,14 @@ async function loadBookmarks(){
   else q=q.eq('session_id',SESSION_ID);
   const{data}=await q;
   bookmarkedIds=new Set((data||[]).map(b=>b.question_id));
+  renderChapterGrid();
   updateBookmarkInfo();
 }
 
 function updateBookmarkInfo(){
-  const info=document.getElementById('bookmarkInfo');
   const btn=document.getElementById('startBtn');
   if(currentMode==='bookmark'){
-    const cnt=bookmarkedIds.size;
-    info.style.display='block';
-    info.textContent=cnt+'問ブックマーク中';
-    btn.disabled=cnt===0;
-  } else {
-    info.style.display='none';
+    btn.disabled=bookmarkedIds.size===0;
   }
 }
 
