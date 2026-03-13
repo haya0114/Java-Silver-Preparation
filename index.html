@@ -43,9 +43,10 @@
   .qnav-btn.done-wrong{border-color:var(--wrong);background:rgba(192,57,43,0.1);color:var(--wrong);}
 
   /* QUIZ CARD */
-  .quiz-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px;position:relative;overflow:hidden;max-width:100%;box-sizing:border-box;}
-  .quiz-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#2f6db5,#1a4f8a);}
-  .chapter-label{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-muted);margin-bottom:10px;letter-spacing:1px;}
+  .quiz-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px;position:relative;overflow:visible;max-width:100%;box-sizing:border-box;}
+  .quiz-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#2f6db5,#1a4f8a);border-radius:12px 12px 0 0;}
+  .chapter-label{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-muted);margin-bottom:4px;letter-spacing:1px;padding-right:44px;}
+  .chapter-sub-label{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-muted);margin-bottom:10px;letter-spacing:0.5px;}
   .question-meta{display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;}
   .question-badge{font-family:'JetBrains Mono',monospace;font-size:11px;background:var(--surface2);border:1px solid var(--border);color:var(--accent2);padding:3px 10px;border-radius:20px;}
   .multi-badge{font-family:'JetBrains Mono',monospace;font-size:11px;background:rgba(247,129,102,0.1);border:1px solid var(--accent);color:var(--accent);padding:3px 10px;border-radius:20px;}
@@ -99,7 +100,7 @@
   .date-filter{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;align-items:center;}
   .filter-btn{font-family:'JetBrains Mono',monospace;font-size:12px;padding:6px 16px;border-radius:20px;border:1px solid var(--border);background:var(--surface2);color:var(--text-muted);cursor:pointer;transition:all 0.15s;}
   .filter-btn.active{border-color:var(--accent2);color:var(--accent2);background:rgba(47,109,181,0.08);}
-  .review-start-btn{font-family:'JetBrains Mono',monospace;font-size:12px;padding:6px 14px;border-radius:20px;border:1px solid var(--accent3);background:rgba(42,125,79,0.06);color:var(--accent3);cursor:pointer;transition:all 0.15s;margin-left:auto;}
+  .review-start-btn{font-family:'JetBrains Mono',monospace;font-size:12px;padding:6px 14px;border-radius:20px;border:1px solid var(--accent3);background:rgba(42,125,79,0.06);color:var(--accent3);cursor:pointer;transition:all 0.15s;}
   .review-start-btn:hover{background:rgba(42,125,79,0.14);}
   .stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px;}
   .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center;}
@@ -201,6 +202,7 @@
   <div class="quiz-card">
     <button class="bookmark-btn" id="bookmarkBtn" onclick="toggleBookmark()" title="ブックマーク">🔖</button>
     <div class="chapter-label" id="chapterLabel"></div>
+    <div class="chapter-sub-label" id="chapterSubLabel"></div>
     <div class="question-meta">
       <span class="question-badge" id="questionBadge">問題</span>
       <span class="multi-badge" id="multiBadge" style="display:none">複数選択</span>
@@ -443,7 +445,7 @@ function renderChapterGrid(){
   const grid=document.getElementById('chapterGrid');
   document.getElementById('selectTitle').textContent=
     currentMode==='mock'?'模擬試験を選択':
-    currentMode==='bookmark'?'ブックマークした問題を出題':
+    currentMode==='bookmark'?'ブックマークした問題を出題（'+bookmarkedIds.size+'問ブックマーク中）':
     '章を選択';
   if(currentMode==='bookmark'){
     grid.innerHTML='';
@@ -485,9 +487,8 @@ async function startQuiz(){
   if(currentMode==='bookmark'){
     if(bookmarkedIds.size===0) return;
     const ids=[...bookmarkedIds];
-    const{data}=await db.from('questions').select('*').in('id',ids);
+    const{data}=await db.from('questions').select('*,chapters(chapter_no,title,is_mock)').in('id',ids);
     if(!data||!data.length){alert('ブックマークした問題が見つかりませんでした');return;}
-    // ランダムシャッフル
     qs=data.sort(()=>Math.random()-0.5);
     selectedChapter=null;
   } else if(currentMode==='review'){
@@ -522,6 +523,15 @@ function renderQuestion(){
   document.getElementById('chapterLabel').textContent=selectedChapter
     ?(selectedChapter.is_mock?'模擬試験 '+selectedChapter.chapter_no+' ─ '+selectedChapter.title:'第'+selectedChapter.chapter_no+'章 ─ '+selectedChapter.title)
     :(currentMode==='bookmark'?'🔖 ブックマーク出題':currentMode==='review'?'📝 復習モード':'');
+  // ブックマーク・復習モード時は問題ごとの章名を表示
+  const subLabel=document.getElementById('chapterSubLabel');
+  if((currentMode==='bookmark'||currentMode==='review')&&q.chapters){
+    const ch=q.chapters;
+    subLabel.textContent=ch.is_mock?'模擬試験 '+ch.chapter_no+' ─ '+ch.title:'第'+ch.chapter_no+'章 ─ '+ch.title;
+    subLabel.style.display='block';
+  } else {
+    subLabel.textContent='';subLabel.style.display='none';
+  }
   document.getElementById('questionBadge').textContent='問題 '+q.question_no;
   document.getElementById('multiBadge').style.display=q.multi?'inline-block':'none';
   document.getElementById('questionText').innerHTML=escHtml(q.text).replace(/\n/g,'<br>');
@@ -782,7 +792,7 @@ function closeReviewModal(){document.getElementById('reviewOverlay').classList.r
 
 async function startReviewAll(wrongIds){
   closeReviewModal();
-  const{data}=await db.from('questions').select('*').in('id',wrongIds);
+  const{data}=await db.from('questions').select('*,chapters(chapter_no,title,is_mock)').in('id',wrongIds);
   if(!data||!data.length){alert('問題が見つかりませんでした');return;}
   questions=data.sort(()=>Math.random()-0.5);
   currentIndex=0;score=0;answeredMap={};
@@ -792,7 +802,7 @@ async function startReviewAll(wrongIds){
 
 async function startReviewChapter(ids){
   closeReviewModal();
-  const{data}=await db.from('questions').select('*').in('id',ids);
+  const{data}=await db.from('questions').select('*,chapters(chapter_no,title,is_mock)').in('id',ids);
   if(!data||!data.length){alert('問題が見つかりませんでした');return;}
   questions=data.sort((a,b)=>a.question_no-b.question_no);
   currentIndex=0;score=0;answeredMap={};
